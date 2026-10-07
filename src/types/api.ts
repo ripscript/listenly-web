@@ -129,6 +129,11 @@ export interface YoutubeSearchResult {
   thumbnail_url?: string
 }
 
+/** Actual gateway shape: { data: { results: [...] } }. */
+export interface YoutubeSearchResponse {
+  results: YoutubeSearchResult[]
+}
+
 export interface AdvanceQueueResponse {
   has_next: boolean
   next_item?: QueueItem

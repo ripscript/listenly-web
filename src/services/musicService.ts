@@ -10,6 +10,7 @@ import type {
   SearchResponse,
   StreamResponse,
   Track,
+  YoutubeSearchResponse,
   YoutubeSearchResult,
 } from '@/types/api'
 
@@ -22,13 +23,19 @@ export const musicService = {
     return unwrap(data)
   },
 
-  /** GET /music/youtube/search?q= — direct YouTube search (limit 10). */
+  /**
+   * GET /music/youtube/search?q= — direct YouTube search (limit 10).
+   * The gateway wraps results as { data: { results: [...] } }; we also
+   * tolerate a bare array for forward/backward compatibility.
+   */
   async searchYoutube(q: string): Promise<YoutubeSearchResult[]> {
-    const { data } = await http.get<BaseResponse<YoutubeSearchResult[]>>(
+    const { data } = await http.get<BaseResponse<YoutubeSearchResponse | YoutubeSearchResult[]>>(
       '/music/youtube/search',
       { params: { q } },
     )
-    return unwrap(data) ?? []
+    const payload = unwrap(data)
+    if (Array.isArray(payload)) return payload
+    return payload?.results ?? []
   },
 
   /** GET /music/tracks/:uuid -> TrackResponse | 404 */
