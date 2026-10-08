@@ -3,9 +3,13 @@ import { useToast } from '@/composables/useToast'
 
 const { toasts, dismiss } = useToast()
 
+// Contrast-safe on the light theme (dark text on a tinted background), with
+// dark-mode overrides so toasts stay readable in both palettes.
 const kindClass: Record<string, string> = {
-  success: 'border-green-500/40 bg-green-500/10 text-green-200',
-  error: 'border-destructive/50 bg-destructive/15 text-red-200',
+  success:
+    'border-green-500/40 bg-green-50 text-green-800 dark:bg-green-500/10 dark:text-green-200',
+  error:
+    'border-red-500/50 bg-red-50 text-red-800 dark:bg-destructive/15 dark:text-red-200',
   info: 'border-border bg-card text-foreground',
 }
 </script>

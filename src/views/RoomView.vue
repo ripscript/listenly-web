@@ -115,8 +115,8 @@ async function leave() {
               class="rounded-full border px-2 py-0.5 text-xs"
               :class="
                 room.visibility === 'public'
-                  ? 'border-green-500/40 text-green-300'
-                  : 'border-amber-500/40 text-amber-300'
+                  ? 'border-green-500/40 text-green-700 dark:text-green-300'
+                  : 'border-amber-500/40 text-amber-700 dark:text-amber-300'
               "
             >
               {{ room.visibility === 'public' ? 'Publik' : 'Privat' }}

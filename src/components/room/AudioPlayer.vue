@@ -37,6 +37,14 @@ const needsGesture = ref(false)
 let suppressTimeUpdate = false
 /** The track uuid whose stream URL is currently loaded into the element. */
 let loadedTrackUuid: string | null = null
+/**
+ * The exact stream URL string we assigned to `el.src`. We compare against this
+ * instead of `el.src`, because the browser normalizes `el.src` to an absolute,
+ * re-encoded URL that never byte-matches the raw backend URL — which would make
+ * the "already loaded" check always fail and re-fetch a new single-use stream
+ * URL on every sync, causing a request storm + endless re-buffering.
+ */
+let loadedStreamUrl: string | null = null
 /** How many times we've retried the stream for the current track (cap at 1). */
 let streamRetries = 0
 /** Prevent overlapping loadAndSync() runs. */
@@ -53,7 +61,10 @@ async function ensureLoaded(force = false): Promise<boolean> {
   if (loading) return !!currentStreamUrl.value
 
   const alreadyLoaded =
-    !force && loadedTrackUuid === track.uuid && !!el.src && el.src === currentStreamUrl.value
+    !force &&
+    loadedTrackUuid === track.uuid &&
+    !!loadedStreamUrl &&
+    loadedStreamUrl === currentStreamUrl.value
   if (alreadyLoaded) return true
 
   loading = true
@@ -61,9 +72,10 @@ async function ensureLoaded(force = false): Promise<boolean> {
   try {
     const url = await store.ensureStreamUrl()
     if (!url) return false
-    if (el.src !== url) {
+    if (loadedStreamUrl !== url) {
       el.src = url
       el.load()
+      loadedStreamUrl = url
     }
     loadedTrackUuid = track.uuid
     return true
@@ -120,6 +132,7 @@ watch(
   (uuid) => {
     streamRetries = 0
     loadedTrackUuid = null
+    loadedStreamUrl = null
     const el = audioEl.value
     if (!uuid) {
       if (el) {
@@ -176,6 +189,7 @@ async function onError() {
   streamRetries++
   currentStreamUrl.value = null
   loadedTrackUuid = null
+  loadedStreamUrl = null
   const ok = await ensureLoaded(true)
   if (ok) void syncPlayback(false)
 }
@@ -284,7 +298,7 @@ onBeforeUnmount(() => {
     <!-- Autoplay-blocked hint (shown once, not as repeated toasts) -->
     <div
       v-if="needsGesture && currentTrack && playback.is_playing"
-      class="mt-3 flex items-center justify-between gap-3 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-200"
+      class="mt-3 flex items-center justify-between gap-3 rounded-md border border-amber-500/40 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:bg-amber-500/10 dark:text-amber-200"
     >
       <span>Browser memblokir autoplay. Ketuk untuk memulai audio.</span>
       <Button size="xs" @click="resumeAudio">Putar audio</Button>
