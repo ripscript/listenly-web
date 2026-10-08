@@ -176,10 +176,88 @@ function onEnded() {
   if (isHost.value) void store.advance()
 }
 
+/** Map a MediaError code to a readable name for diagnostics. */
+function mediaErrorName(code: number | undefined): string {
+  switch (code) {
+    case 1:
+      return 'MEDIA_ERR_ABORTED'
+    case 2:
+      return 'MEDIA_ERR_NETWORK'
+    case 3:
+      return 'MEDIA_ERR_DECODE'
+    case 4:
+      return 'MEDIA_ERR_SRC_NOT_SUPPORTED'
+    default:
+      return `UNKNOWN(${code})`
+  }
+}
+
+/**
+ * Diagnostic probe: fetch the stream URL directly so we can see the HTTP
+ * status, content-type, CORS behaviour, and whether range requests are honored.
+ * This is logging only — it doesn't change playback behaviour.
+ */
+async function debugProbeStream(url: string): Promise<void> {
+  // eslint-disable-next-line no-console
+  console.group('[AudioPlayer] stream probe')
+  // eslint-disable-next-line no-console
+  console.log('url:', url)
+  try {
+    const res = await fetch(url, { headers: { Range: 'bytes=0-1' } })
+    // eslint-disable-next-line no-console
+    console.log('status:', res.status, res.statusText)
+    // eslint-disable-next-line no-console
+    console.log('type (response):', res.type) // "cors" | "opaque" | "basic"...
+    // eslint-disable-next-line no-console
+    console.log('content-type:', res.headers.get('content-type'))
+    // eslint-disable-next-line no-console
+    console.log('content-length:', res.headers.get('content-length'))
+    // eslint-disable-next-line no-console
+    console.log('accept-ranges:', res.headers.get('accept-ranges'))
+    // eslint-disable-next-line no-console
+    console.log('content-range:', res.headers.get('content-range'))
+    // eslint-disable-next-line no-console
+    console.log('access-control-allow-origin:', res.headers.get('access-control-allow-origin'))
+    const ct = res.headers.get('content-type') || ''
+    if (!ct.startsWith('audio/') && !ct.includes('mpegurl') && !ct.includes('octet-stream')) {
+      // Likely an HTML/JSON error page returned with 200 — show a snippet.
+      const text = await res.clone().text()
+      // eslint-disable-next-line no-console
+      console.warn('non-audio body (first 300 chars):', text.slice(0, 300))
+    }
+  } catch (e) {
+    // A thrown TypeError here almost always means CORS blocked the request.
+    // eslint-disable-next-line no-console
+    console.error('probe fetch failed (likely CORS or network):', e)
+  }
+  // eslint-disable-next-line no-console
+  console.groupEnd()
+}
+
 async function onError() {
   // Ignore errors when there is no real source loaded yet.
   const el = audioEl.value
   if (!el || !currentTrack.value || !el.src) return
+
+  // --- Diagnostics (temporary): surface WHY the <audio> failed. ---
+  const merr = el.error
+  // eslint-disable-next-line no-console
+  console.error(
+    '[AudioPlayer] load error:',
+    mediaErrorName(merr?.code),
+    '| message:',
+    merr?.message || '(none)',
+    '| networkState:',
+    el.networkState,
+    '| readyState:',
+    el.readyState,
+    '| src:',
+    el.currentSrc || el.src,
+  )
+  const probeUrl = currentStreamUrl.value || el.currentSrc || el.src
+  if (probeUrl) void debugProbeStream(probeUrl)
+  // --- end diagnostics ---
+
   // Stream URLs expire; re-request ONCE per track to avoid an infinite loop
   // of /stream calls (PRD §7.1, §11).
   if (streamRetries >= 1) {
